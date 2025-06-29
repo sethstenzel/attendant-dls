@@ -5,3 +5,5 @@ import sys
 logger.remove()
 logger.add(sys.stdout, level="INFO")
 logger.add("errors.log", level="ERROR")
+
+app_settings = AppSettings()
