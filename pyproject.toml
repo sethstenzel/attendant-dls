@@ -1,0 +1,7 @@
+[project]
+name = "attendant_dls"
+version = "0.0.1"
+requires-python = ">=3.13"
+
+[tool.setuptools.packages.find]
+where = ["src"]

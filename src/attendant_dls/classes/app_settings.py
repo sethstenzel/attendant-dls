@@ -19,13 +19,14 @@ class Setting:
         self.value = self.set_value(loaded_value)
 
     def set_value(self, loaded_value: Any) -> Union[str, int, bool]:
+        loaded_value = loaded_value.strip()
         try:
             if loaded_value not in self.allowed_values and self.allowed_values != ["*"]:
                 logger.warning(f"Value '{loaded_value}' not allowed for setting '{self.name}'. Allowed: {self.allowed_values}")
                 return self.default_value
             
-            if isinstance(self.value_type, bool):
-                return "Y" == loaded_value.strip()
+            if self.value_type is bool:
+                return "Y" == loaded_value
             
             cast_value = self.value_type(loaded_value)
 
