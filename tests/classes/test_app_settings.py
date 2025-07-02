@@ -1,94 +1,65 @@
-import types
+from attendant_dls.classes.app_settings import AppSettings
 import pytest
-from attendant_dls.classes.app_settings import Setting, AppSettings
+import types
+from pathlib import Path
+import os
+
+TESTING_SETTINGS_DEFAULTS_AND_ALLOWED_VALUES = [
+    {"name":"TEST_KEY_ADLS", "default_value":"0987654321", "allowed_values":["*"], "value_type":str},
+    {"name":"TEST_SETTING_ADLS", "default_value":"A1", "allowed_values":["A1", "B2", "C3"], "value_type":str},
+    {"name":"TEST_BOOL_SETTING_ADLS", "default_value":"Y", "allowed_values":["Y", "N"], "value_type":bool}
+]
 
 @pytest.fixture(autouse=True)
 def mute_logger(monkeypatch):
     no_op = types.SimpleNamespace(warning=lambda *_, **__: None)
     monkeypatch.setattr("attendant_dls.classes.app_settings.logger", no_op)
 
+def test_set_env_vars_from_file(monkeypatch):
+    monkeypatch.delenv("TEST_KEY_ADLS", raising=False)
+    monkeypatch.delenv("TEST_SETTING_ADLS", raising=False)
+    monkeypatch.delenv("TEST_BOOL_SETTING_ADLS", raising=False)
+    monkeypatch.setattr(AppSettings, "SETTINGS_DEFAULTS_AND_ALLOWED_VALUES", TESTING_SETTINGS_DEFAULTS_AND_ALLOWED_VALUES)
 
-def test_allowed_value_casted():
-    """
-    When `loaded_value` is in `allowed_values`, the raw value should be
-    converted with `value_type` and assigned to `.value`.
-    """
-    s = Setting(
-        name="windows",
-        loaded_value="11",
-        default_value=4,
-        allowed_values=["11", "10", "7"],
-        value_type=int,
-    )
-    assert s.value == 11
+    test_dir = Path(__file__).parent
+    config_path = test_dir / "test.cfg"
 
-
-def test_wildcard_allows_anything():
-    """
-    A literal ["*"] in `allowed_values` is treated as a wildcard:
-    "every" input is accepted and type-cast.
-    """
-    s = Setting(
-        name="anything",
-        loaded_value="you can do i can do better",
-        default_value="no you can't",
-        allowed_values=["*"],
-        value_type=str,
-    )
-    assert s.value == "you can do i can do better"
+    AppSettings(config_path)
+       
+    assert os.environ["TEST_KEY_ADLS"] == "1234567890"
+    assert os.environ["TEST_SETTING_ADLS"] == "B2"
+    assert os.environ["TEST_BOOL_SETTING_ADLS"] == "N"
 
 
-def test_disallowed_value_falls_back_to_default():
-    """
-    If the value is *not* in the list (and no wildcard), the class should
-    ignore the supplied value and keep the provided default.
-    """
-    s = Setting(
-        name="favorite_foods",
-        loaded_value="avacado",
-        default_value="pizza",
-        allowed_values=["sushi", "steak", "blt"],
-        value_type=str,
-    )
-    assert s.value == "pizza"
+def test_get_settings(monkeypatch):
+    monkeypatch.delenv("TEST_KEY_ADLS", raising=False)
+    monkeypatch.delenv("TEST_SETTING_ADLS", raising=False)
+    monkeypatch.delenv("TEST_BOOL_SETTING_ADLS", raising=False)
+    monkeypatch.setattr(AppSettings, "SETTINGS_DEFAULTS_AND_ALLOWED_VALUES", TESTING_SETTINGS_DEFAULTS_AND_ALLOWED_VALUES)
+
+    test_dir = Path(__file__).parent
+    config_path = test_dir / "test.cfg"
+
+    app_settings = AppSettings(config_path)
+
+    assert app_settings.env_vars_file_loaded is True   
+    assert app_settings.test_key_adls.value == '1234567890'
+    assert app_settings.test_setting_adls.value == 'B2'
+    assert app_settings.test_bool_setting_adls.value is False
 
 
-@pytest.mark.parametrize(
-    "raw, expected",
-    [
-        ("Y", True),
-        ("N", False),
-        ("  Y  ", True),
-        ("      N     ", False)
-    ],
-)
+def test_get_settings_bad_cfg(monkeypatch):
+    monkeypatch.delenv("TEST_KEY_ADLS", raising=False)
+    monkeypatch.delenv("TEST_SETTING_ADLS", raising=False)
+    monkeypatch.delenv("TEST_BOOL_SETTING_ADLS", raising=False)
+    monkeypatch.setattr(AppSettings, "SETTINGS_DEFAULTS_AND_ALLOWED_VALUES", TESTING_SETTINGS_DEFAULTS_AND_ALLOWED_VALUES)
 
+    test_dir = Path(__file__).parent
+    config_path = test_dir / "bad_test.cfg"
 
-def test_boolean_translation(raw, expected):
-    """
-    When `value_type` is `bool`, the code should **bypass** normal casting
-    and use the custom `"Y" == loaded_value.strip()` rule.
-    """
-    s = Setting(
-        name="enabled",
-        loaded_value=raw,
-        default_value=True,
-        allowed_values=["Y", "N"],
-        value_type=bool,
-    )
-    assert s.value is expected
+    app_settings = AppSettings(config_path)
 
-
-def test_invalid_cast_returns_default():
-    """
-    If casting the supplied value raises `ValueError` or `TypeError`,
-    `.value` must fall back to `default_value`.
-    """
-    s = Setting(
-        name="iq",
-        loaded_value="not-an-int",
-        default_value=150,
-        allowed_values=["*"],
-        value_type=int,
-    )
-    assert s.value == 150
+    assert app_settings.env_vars_file_loaded is True   
+    assert app_settings.test_key_adls.value == '0987654321'
+    assert app_settings.test_setting_adls.value == 'A1'
+    assert app_settings.test_bool_setting_adls.value is False

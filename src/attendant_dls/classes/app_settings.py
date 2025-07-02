@@ -1,43 +1,11 @@
 import os
 from dotenv import load_dotenv
 from loguru import logger
-from typing import Union, List, Any
-
-class Setting:
-    def __init__(
-        self,
-        name: str,
-        loaded_value: Union[str, int, bool],
-        default_value: Union[str, int, bool],
-        allowed_values: List[Union[str, int, bool]],
-        value_type: type
-    ):
-        self.name = name
-        self.default_value = default_value
-        self.allowed_values = allowed_values
-        self.value_type = value_type
-        self.value = self.set_value(loaded_value)
-
-    def set_value(self, loaded_value: Any) -> Union[str, int, bool]:
-        loaded_value = loaded_value.strip()
-        try:
-            if loaded_value not in self.allowed_values and self.allowed_values != ["*"]:
-                logger.warning(f"Value '{loaded_value}' not allowed for setting '{self.name}'. Allowed: {self.allowed_values}")
-                return self.default_value
-            
-            if self.value_type is bool:
-                return "Y" == loaded_value
-            
-            cast_value = self.value_type(loaded_value)
-
-        except (ValueError, TypeError):
-            logger.warning(f"Invalid type for setting '{self.name}': expected {self.value_type.__name__}")
-            return self.default_value
-        return cast_value  
+from .settings import Setting
 
 
 class AppSettings:
-    SETTINGS_AND_DEFAULTS = [
+    SETTINGS_DEFAULTS_AND_ALLOWED_VALUES = [
         {"name":"ATTENDANT_KEY", "default_value":"DEMO-06-28-2025", "allowed_values":["*"], "value_type":str},
         {"name":"ATTENDANT_ORG", "default_value":"Y", "allowed_values":["T", "Y", "M"], "value_type":bool},
         {"name":"ATTENDANT_ORG_BY_TYPE", "default_value":"", "allowed_values":["Y", "N"], "value_type":bool},
@@ -52,24 +20,32 @@ class AppSettings:
         {"name":"ATTENDANT_TRAY_ICON", "default_value":"Y", "allowed_values":["Y", "N"], "value_type":bool}
     ]
 
-    def __init__(self):
+    def __init__(self, settings_path):
+        self.env_vars_file_loaded = False
+        self.settings_path = settings_path
+        self.set_env_vars_from_file()
+        self.get_settings()
+
+    def set_env_vars_from_file(self):
         try:
-            load_dotenv("./settings.cfg")
-            self.dotenv_loaded = True
+            load_dotenv(self.settings_path)
+            self.env_vars_file_loaded = True               
         except:
             logger.warning("Unable to load settings from settings.cfg file, defaults will be used.")
-            self.dotenv_loaded = False
 
-        self.set_settings()
 
-    def set_settings(self):
-        for setting in self.SETTINGS_AND_DEFAULTS:
+    def get_settings(self):
+        for setting in self.SETTINGS_DEFAULTS_AND_ALLOWED_VALUES:
+            setting_value = os.getenv(setting["name"])
+            if setting_value is None or setting_value == "":
+                setting_value = setting["default_value"]
+                logger.warning(f"Unable to load setting: {setting["name"]}, default value will be used.")
             setattr(
                 self,
                 setting["name"].lower(),
                 Setting(
                     setting["name"].lower(),
-                    os.getenv(setting["name"], setting["default_value"]),
+                    setting_value,
                     setting["default_value"],
                     setting["allowed_values"],
                     setting["value_type"]
